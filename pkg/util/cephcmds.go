@@ -25,6 +25,7 @@ import (
 	"os/exec"
 	"strings"
 
+	"golang.org/x/net/context"
 	"k8s.io/klog"
 )
 
@@ -143,12 +144,12 @@ func SetOMapKeyValue(monitors string, cr *Credentials, poolName, namespace, oMap
 }
 
 // GetOMapValue gets the value for the given key from the named omap
-func GetOMapValue(monitors string, cr *Credentials, poolName, namespace, oMapName, oMapKey string) (string, error) {
+func GetOMapValue(ctx context.Context, monitors string, cr *Credentials, poolName, namespace, oMapName, oMapKey string) (string, error) {
 	// Command: "rados <options> getomapval oMapName oMapKey <outfile>"
 	// No such key: replicapool/csi.volumes.directory.default/csi.volname
 	tmpFile, err := ioutil.TempFile("", "omap-get-")
 	if err != nil {
-		klog.Errorf("failed creating a temporary file for key contents")
+		Errorf(ctx, "failed creating a temporary file for key contents")
 		return "", err
 	}
 	defer tmpFile.Close()
@@ -182,7 +183,7 @@ func GetOMapValue(monitors string, cr *Credentials, poolName, namespace, oMapNam
 		}
 
 		// log other errors for troubleshooting assistance
-		klog.Errorf("failed getting omap value for key (%s) from omap (%s) in pool (%s): (%v)",
+		Errorf(ctx, "failed getting omap value for key (%s) from omap (%s) in pool (%s): (%v)",
 			oMapKey, oMapName, poolName, err)
 
 		return "", fmt.Errorf("error (%v) occurred, command output streams is (%s)",
@@ -194,7 +195,7 @@ func GetOMapValue(monitors string, cr *Credentials, poolName, namespace, oMapNam
 }
 
 // RemoveOMapKey removes the omap key from the given omap name
-func RemoveOMapKey(monitors string, cr *Credentials, poolName, namespace, oMapName, oMapKey string) error {
+func RemoveOMapKey(ctx context.Context, monitors string, cr *Credentials, poolName, namespace, oMapName, oMapKey string) error {
 	// Command: "rados <options> rmomapkey oMapName oMapKey"
 	args := []string{
 		"-m", monitors,
@@ -212,7 +213,7 @@ func RemoveOMapKey(monitors string, cr *Credentials, poolName, namespace, oMapNa
 	_, _, err := ExecCommand("rados", args[:]...)
 	if err != nil {
 		// NOTE: Missing omap key removal does not return an error
-		klog.Errorf("failed removing key (%s), from omap (%s) in "+
+		Errorf(ctx, "failed removing key (%s), from omap (%s) in "+
 			"pool (%s): (%v)", oMapKey, oMapName, poolName, err)
 		return err
 	}
@@ -222,7 +223,7 @@ func RemoveOMapKey(monitors string, cr *Credentials, poolName, namespace, oMapNa
 
 // CreateObject creates the object name passed in and returns ErrObjectExists if the provided object
 // is already present in rados
-func CreateObject(monitors string, cr *Credentials, poolName, namespace, objectName string) error {
+func CreateObject(ctx context.Context, monitors string, cr *Credentials, poolName, namespace, objectName string) error {
 	// Command: "rados <options> create objectName"
 	args := []string{
 		"-m", monitors,
@@ -239,7 +240,7 @@ func CreateObject(monitors string, cr *Credentials, poolName, namespace, objectN
 
 	_, stderr, err := ExecCommand("rados", args[:]...)
 	if err != nil {
-		klog.Errorf("failed creating omap (%s) in pool (%s): (%v)", objectName, poolName, err)
+		Errorf(ctx,"failed creating omap (%s) in pool (%s): (%v)", objectName, poolName, err)
 		if strings.Contains(string(stderr), "error creating "+poolName+"/"+objectName+
 			": (17) File exists") {
 			return ErrObjectExists{objectName, err}
@@ -252,7 +253,7 @@ func CreateObject(monitors string, cr *Credentials, poolName, namespace, objectN
 
 // RemoveObject removes the entire omap name passed in and returns ErrObjectNotFound is provided omap
 // is not found in rados
-func RemoveObject(monitors string, cr *Credentials, poolName, namespace, oMapName string) error {
+func RemoveObject(ctx context.Context, monitors string, cr *Credentials, poolName, namespace, oMapName string) error {
 	// Command: "rados <options> rm oMapName"
 	args := []string{
 		"-m", monitors,
@@ -269,7 +270,7 @@ func RemoveObject(monitors string, cr *Credentials, poolName, namespace, oMapNam
 
 	_, stderr, err := ExecCommand("rados", args[:]...)
 	if err != nil {
-		klog.Errorf("failed removing omap (%s) in pool (%s): (%v)", oMapName, poolName, err)
+		Errorf(ctx, "failed removing omap (%s) in pool (%s): (%v)", oMapName, poolName, err)
 		if strings.Contains(string(stderr), "error removing "+poolName+">"+oMapName+
 			": (2) No such file or directory") {
 			return ErrObjectNotFound{oMapName, err}

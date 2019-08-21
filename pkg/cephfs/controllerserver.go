@@ -45,21 +45,21 @@ var (
 )
 
 // createBackingVolume creates the backing subvolume and on any error cleans up any created entities
-func (cs *ControllerServer) createBackingVolume(volOptions *volumeOptions, vID *volumeIdentifier, secret map[string]string) error {
+func (cs *ControllerServer) createBackingVolume(ctx context.Context, volOptions *volumeOptions, vID *volumeIdentifier, secret map[string]string) error {
 	cr, err := util.NewAdminCredentials(secret)
 	if err != nil {
 		return status.Error(codes.InvalidArgument, err.Error())
 	}
 	defer cr.DeleteCredentials()
 
-	if err = createVolume(volOptions, cr, volumeID(vID.FsSubvolName), volOptions.Size); err != nil {
-		klog.Errorf("failed to create volume %s: %v", volOptions.RequestName, err)
+	if err = createVolume(ctx, volOptions, cr, volumeID(vID.FsSubvolName), volOptions.Size); err != nil {
+		util.Errorf(ctx,"failed to create volume %s: %v", volOptions.RequestName, err)
 		return status.Error(codes.Internal, err.Error())
 	}
 	defer func() {
 		if err != nil {
-			if errDefer := purgeVolume(volumeID(vID.FsSubvolName), cr, volOptions); errDefer != nil {
-				klog.Warningf("failed purging volume: %s (%s)", volOptions.RequestName, errDefer)
+			if errDefer := purgeVolume(ctx, volumeID(vID.FsSubvolName), cr, volOptions); errDefer != nil {
+				util.Warningf(ctx, "failed purging volume: %s (%s)", volOptions.RequestName, errDefer)
 			}
 		}
 	}()
@@ -70,7 +70,7 @@ func (cs *ControllerServer) createBackingVolume(volOptions *volumeOptions, vID *
 // CreateVolume creates a reservation and the volume in backend, if it is not already present
 func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVolumeRequest) (*csi.CreateVolumeResponse, error) {
 	if err := cs.validateCreateVolumeRequest(req); err != nil {
-		klog.Errorf("CreateVolumeRequest validation failed: %v", err)
+		util.Errorf(ctx, "CreateVolumeRequest validation failed: %v", err)
 		return nil, err
 	}
 
@@ -80,7 +80,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	volOptions, err := newVolumeOptions(requestName, req.GetCapacityRange().GetRequiredBytes(),
 		req.GetParameters(), secret)
 	if err != nil {
-		klog.Errorf("validation and extraction of volume options failed: %v", err)
+		util.Errorf(ctx, "validation and extraction of volume options failed: %v", err)
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
@@ -88,7 +88,7 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	idLk := volumeNameLocker.Lock(requestName)
 	defer volumeNameLocker.Unlock(idLk, requestName)
 
-	vID, err := checkVolExists(volOptions, secret)
+	vID, err := checkVolExists(ctx, volOptions, secret)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -103,27 +103,27 @@ func (cs *ControllerServer) CreateVolume(ctx context.Context, req *csi.CreateVol
 	}
 
 	// Reservation
-	vID, err = reserveVol(volOptions, secret)
+	vID, err = reserveVol(ctx, volOptions, secret)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	defer func() {
 		if err != nil {
-			errDefer := undoVolReservation(volOptions, *vID, secret)
+			errDefer := undoVolReservation(ctx, volOptions, *vID, secret)
 			if errDefer != nil {
-				klog.Warningf("failed undoing reservation of volume: %s (%s)",
+				util.Warningf(ctx, "failed undoing reservation of volume: %s (%s)",
 					requestName, errDefer)
 			}
 		}
 	}()
 
 	// Create a volume
-	err = cs.createBackingVolume(volOptions, vID, secret)
+	err = cs.createBackingVolume(ctx, volOptions, vID, secret)
 	if err != nil {
 		return nil, err
 	}
 
-	klog.Infof("cephfs: successfully created backing volume named %s for request name %s",
+	util.Infof(ctx, "cephfs: successfully created backing volume named %s for request name %s",
 		vID.FsSubvolName, requestName)
 
 	return &csi.CreateVolumeResponse{
@@ -201,7 +201,7 @@ func (cs *ControllerServer) deleteVolumeDeprecated(req *csi.DeleteVolumeRequest)
 // DeleteVolume deletes the volume in backend and its reservation
 func (cs *ControllerServer) DeleteVolume(ctx context.Context, req *csi.DeleteVolumeRequest) (*csi.DeleteVolumeResponse, error) {
 	if err := cs.validateDeleteVolumeRequest(); err != nil {
-		klog.Errorf("DeleteVolumeRequest validation failed: %v", err)
+		util.Errorf(ctx, "DeleteVolumeRequest validation failed: %v", err)
 		return nil, err
 	}
 

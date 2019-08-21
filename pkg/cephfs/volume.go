@@ -26,6 +26,7 @@ import (
 	"github.com/ceph/ceph-csi/pkg/util"
 
 	"k8s.io/klog"
+	"golang.org/x/net/context"
 )
 
 const (
@@ -73,10 +74,11 @@ func getVolumeRootPathCeph(volOptions *volumeOptions, cr *util.Credentials, volI
 	return strings.TrimSuffix(string(stdout), "\n"), nil
 }
 
-func createVolume(volOptions *volumeOptions, cr *util.Credentials, volID volumeID, bytesQuota int64) error {
+func createVolume(ctx context.Context, volOptions *volumeOptions, cr *util.Credentials, volID volumeID, bytesQuota int64) error {
 	//TODO: When we support multiple fs, need to hande subvolume group create for all fs's
 	if !cephfsInit {
 		err := execCommandErr(
+			ctx,
 			"ceph",
 			"fs",
 			"subvolumegroup",
@@ -88,10 +90,10 @@ func createVolume(volOptions *volumeOptions, cr *util.Credentials, volID volumeI
 			"-n", cephEntityClientPrefix+cr.ID,
 			"--keyfile="+cr.KeyFile)
 		if err != nil {
-			klog.Errorf("failed to create subvolume group csi, for the vol %s(%s)", string(volID), err)
+			util.Errorf(ctx, "failed to create subvolume group csi, for the vol %s(%s)", string(volID), err)
 			return err
 		}
-		klog.V(4).Infof("cephfs: created subvolume group csi")
+		util.V(4).Infof(ctx, "cephfs: created subvolume group csi")
 		cephfsInit = true
 	}
 
@@ -116,10 +118,11 @@ func createVolume(volOptions *volumeOptions, cr *util.Credentials, volID volumeI
 	}
 
 	err := execCommandErr(
+		ctx,
 		"ceph",
 		args[:]...)
 	if err != nil {
-		klog.Errorf("failed to create subvolume %s(%s) in fs %s", string(volID), err, volOptions.FsName)
+		util.Errorf(ctx, "failed to create subvolume %s(%s) in fs %s", string(volID), err, volOptions.FsName)
 		return err
 	}
 
@@ -190,8 +193,9 @@ func purgeVolumeDeprecated(volID volumeID, adminCr *util.Credentials, volOptions
 	return nil
 }
 
-func purgeVolume(volID volumeID, cr *util.Credentials, volOptions *volumeOptions) error {
+func purgeVolume(ctx context.Context, volID volumeID, cr *util.Credentials, volOptions *volumeOptions) error {
 	err := execCommandErr(
+		ctx,
 		"ceph",
 		"fs",
 		"subvolume",
@@ -206,7 +210,7 @@ func purgeVolume(volID volumeID, cr *util.Credentials, volOptions *volumeOptions
 		"-n", cephEntityClientPrefix+cr.ID,
 		"--keyfile="+cr.KeyFile)
 	if err != nil {
-		klog.Errorf("failed to purge subvolume %s(%s) in fs %s", string(volID), err, volOptions.FsName)
+		util.Errorf(ctx, "failed to purge subvolume %s(%s) in fs %s", string(volID), err, volOptions.FsName)
 		return err
 	}
 

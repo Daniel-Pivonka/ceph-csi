@@ -19,7 +19,7 @@ package cephfs
 import (
 	"github.com/ceph/ceph-csi/pkg/util"
 
-	"k8s.io/klog"
+	"golang.org/x/net/context"
 )
 
 // volumeIdentifier structure contains an association between the CSI VolumeID to its subvolume
@@ -43,7 +43,7 @@ because, the order of omap creation and deletion are inverse of each other, and 
 request name lock, and hence any stale omaps are leftovers from incomplete transactions and are
 hence safe to garbage collect.
 */
-func checkVolExists(volOptions *volumeOptions, secret map[string]string) (*volumeIdentifier, error) {
+func checkVolExists(ctx context.Context, volOptions *volumeOptions, secret map[string]string) (*volumeIdentifier, error) {
 	var (
 		vi  util.CSIIdentifier
 		vid volumeIdentifier
@@ -55,7 +55,7 @@ func checkVolExists(volOptions *volumeOptions, secret map[string]string) (*volum
 	}
 	defer cr.DeleteCredentials()
 
-	imageUUID, err := volJournal.CheckReservation(volOptions.Monitors, cr,
+	imageUUID, err := volJournal.CheckReservation(ctx, volOptions.Monitors, cr,
 		volOptions.MetadataPool, volOptions.RequestName, "")
 	if err != nil {
 		return nil, err
@@ -79,21 +79,21 @@ func checkVolExists(volOptions *volumeOptions, secret map[string]string) (*volum
 		return nil, err
 	}
 
-	klog.V(4).Infof("Found existing volume (%s) with subvolume name (%s) for request (%s)",
+	util.V(4).Infof(ctx, "Found existing volume (%s) with subvolume name (%s) for request (%s)",
 		vid.VolumeID, vid.FsSubvolName, volOptions.RequestName)
 
 	return &vid, nil
 }
 
 // undoVolReservation is a helper routine to undo a name reservation for a CSI VolumeName
-func undoVolReservation(volOptions *volumeOptions, vid volumeIdentifier, secret map[string]string) error {
+func undoVolReservation(ctx context.Context, volOptions *volumeOptions, vid volumeIdentifier, secret map[string]string) error {
 	cr, err := util.NewAdminCredentials(secret)
 	if err != nil {
 		return err
 	}
 	defer cr.DeleteCredentials()
 
-	err = volJournal.UndoReservation(volOptions.Monitors, cr, volOptions.MetadataPool,
+	err = volJournal.UndoReservation(ctx, volOptions.Monitors, cr, volOptions.MetadataPool,
 		vid.FsSubvolName, volOptions.RequestName)
 
 	return err
@@ -101,7 +101,7 @@ func undoVolReservation(volOptions *volumeOptions, vid volumeIdentifier, secret 
 
 // reserveVol is a helper routine to request a UUID reservation for the CSI VolumeName and,
 // to generate the volume identifier for the reserved UUID
-func reserveVol(volOptions *volumeOptions, secret map[string]string) (*volumeIdentifier, error) {
+func reserveVol(ctx context.Context, volOptions *volumeOptions, secret map[string]string) (*volumeIdentifier, error) {
 	var (
 		vi  util.CSIIdentifier
 		vid volumeIdentifier
@@ -113,7 +113,7 @@ func reserveVol(volOptions *volumeOptions, secret map[string]string) (*volumeIde
 	}
 	defer cr.DeleteCredentials()
 
-	imageUUID, err := volJournal.ReserveName(volOptions.Monitors, cr,
+	imageUUID, err := volJournal.ReserveName(ctx, volOptions.Monitors, cr,
 		volOptions.MetadataPool, volOptions.RequestName, "")
 	if err != nil {
 		return nil, err
@@ -132,7 +132,7 @@ func reserveVol(volOptions *volumeOptions, secret map[string]string) (*volumeIde
 		return nil, err
 	}
 
-	klog.V(4).Infof("Generated Volume ID (%s) and subvolume name (%s) for request name (%s)",
+	util.V(4).Infof(ctx, "Generated Volume ID (%s) and subvolume name (%s) for request name (%s)",
 		vid.VolumeID, vid.FsSubvolName, volOptions.RequestName)
 
 	return &vid, nil
