@@ -262,7 +262,7 @@ func (mc *volumeMountCacheMap) nodePublishVolume(ctx context.Context, volID, tar
 	return mc.updateNodeCache(ctx, volID)
 }
 
-func (mc *volumeMountCacheMap) nodeUnPublishVolume(volID, targetPath string) error {
+func (mc *volumeMountCacheMap) nodeUnPublishVolume(ctx context.Context, volID, targetPath string) error {
 	if !mc.isEnable() {
 		return nil
 	}
@@ -274,7 +274,7 @@ func (mc *volumeMountCacheMap) nodeUnPublishVolume(volID, targetPath string) err
 		return errors.New("mount-cache: node unpublish volume failed to find cache entry for volume")
 	}
 	delete(volumeMountCache.volumes[volID].TargetPaths, targetPath)
-	return mc.updateNodeCache(volID)
+	return mc.updateNodeCache(ctx, volID)
 }
 
 func (mc *volumeMountCacheMap) updateNodeCache(ctx context.Context, volID string) error {

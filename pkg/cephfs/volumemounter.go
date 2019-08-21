@@ -28,8 +28,6 @@ import (
 
 	"github.com/ceph/ceph-csi/pkg/util"
 	"golang.org/x/net/context"
-
-	"k8s.io/klog"
 )
 
 const (
@@ -212,8 +210,8 @@ func bindMount(ctx context.Context, from, to string, readOnly bool, mntOptions [
 	return nil
 }
 
-func unmountVolume(mountPoint string) error {
-	if err := execCommandErr("umount", mountPoint); err != nil {
+func unmountVolume(ctx context.Context, mountPoint string) error {
+	if err := execCommandErr(ctx, "umount", mountPoint); err != nil {
 		return err
 	}
 
@@ -227,10 +225,10 @@ func unmountVolume(mountPoint string) error {
 	if ok {
 		p, err := os.FindProcess(pid)
 		if err != nil {
-			klog.Warningf("failed to find process %d: %v", pid, err)
+			util.Warningf(ctx, "failed to find process %d: %v", pid, err)
 		} else {
 			if _, err = p.Wait(); err != nil {
-				klog.Warningf("%d is not a child process: %v", pid, err)
+				util.Warningf(ctx, "%d is not a child process: %v", pid, err)
 			}
 		}
 	}

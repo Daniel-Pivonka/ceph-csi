@@ -245,12 +245,12 @@ func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	targetPath := req.GetTargetPath()
 
 	volID := req.GetVolumeId()
-	if err = volumeMountCache.nodeUnPublishVolume(volID, targetPath); err != nil {
-		klog.Warningf("mount-cache: failed to unpublish volume %s %s: %v", volID, targetPath, err)
+	if err = volumeMountCache.nodeUnPublishVolume(ctx, volID, targetPath); err != nil {
+		util.Warningf(ctx, "mount-cache: failed to unpublish volume %s %s: %v", volID, targetPath, err)
 	}
 
 	// Unmount the bind-mount
-	if err = unmountVolume(targetPath); err != nil {
+	if err = unmountVolume(ctx, targetPath); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -258,7 +258,7 @@ func (ns *NodeServer) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	klog.Infof("cephfs: successfully unbinded volume %s from %s", req.GetVolumeId(), targetPath)
+	util.Infof(ctx, "cephfs: successfully unbinded volume %s from %s", req.GetVolumeId(), targetPath)
 
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 }
