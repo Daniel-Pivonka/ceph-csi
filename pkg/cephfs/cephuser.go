@@ -17,6 +17,7 @@ limitations under the License.
 package cephfs
 
 import (
+	"golang.org/x/net/context"
 	"github.com/ceph/ceph-csi/pkg/util"
 )
 
@@ -33,11 +34,11 @@ func getCephUserName(volID volumeID) string {
 	return cephUserPrefix + string(volID)
 }
 
-func deleteCephUserDeprecated(volOptions *volumeOptions, adminCr *util.Credentials, volID volumeID) error {
+func deleteCephUserDeprecated(ctx context.Context, volOptions *volumeOptions, adminCr *util.Credentials, volID volumeID) error {
 	adminID, userID := genUserIDs(adminCr, volID)
 
 	// TODO: Need to return success if userID is not found
-	return execCommandErr("ceph",
+	return execCommandErr(ctx, "ceph",
 		"-m", volOptions.Monitors,
 		"-n", adminID,
 		"--keyfile="+adminCr.KeyFile,

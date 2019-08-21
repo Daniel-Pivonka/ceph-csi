@@ -25,8 +25,8 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"k8s.io/klog"
 
+	"golang.org/x/net/context"
 	"github.com/ceph/ceph-csi/pkg/util"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 )
@@ -64,8 +64,8 @@ func execCommandErr(ctx context.Context, program string, args ...string) error {
 }
 
 //nolint: unparam
-func execCommandJSON(v interface{}, program string, args ...string) error {
-	stdout, _, err := execCommand(program, args...)
+func execCommandJSON(ctx context.Context, v interface{}, program string, args ...string) error {
+	stdout, _, err := execCommand(ctx, program, args...)
 	if err != nil {
 		return err
 	}

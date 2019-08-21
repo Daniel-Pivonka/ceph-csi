@@ -23,6 +23,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/ceph/ceph-csi/pkg/util"
+	"golang.org/x/net/context"
 )
 
 type volumeOptions struct {
@@ -172,7 +173,7 @@ func newVolumeOptions(requestName string, size int64, volOptions, secret map[str
 
 // newVolumeOptionsFromVolID generates a new instance of volumeOptions and volumeIdentifier
 // from the provided CSI VolumeID
-func newVolumeOptionsFromVolID(volID string, volOpt, secrets map[string]string) (*volumeOptions, *volumeIdentifier, error) {
+func newVolumeOptionsFromVolID(ctx context.Context, volID string, volOpt, secrets map[string]string) (*volumeOptions, *volumeIdentifier, error) {
 	var (
 		vi         util.CSIIdentifier
 		volOptions volumeOptions
@@ -201,17 +202,17 @@ func newVolumeOptionsFromVolID(volID string, volOpt, secrets map[string]string) 
 	}
 	defer cr.DeleteCredentials()
 
-	volOptions.FsName, err = getFsName(volOptions.Monitors, cr, volOptions.FscID)
+	volOptions.FsName, err = getFsName(ctx, volOptions.Monitors, cr, volOptions.FscID)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	volOptions.MetadataPool, err = getMetadataPool(volOptions.Monitors, cr, volOptions.FsName)
+	volOptions.MetadataPool, err = getMetadataPool(ctx, volOptions.Monitors, cr, volOptions.FsName)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	volOptions.RequestName, _, err = volJournal.GetObjectUUIDData(volOptions.Monitors, cr,
+	volOptions.RequestName, _, err = volJournal.GetObjectUUIDData(ctx, volOptions.Monitors, cr,
 		volOptions.MetadataPool, vi.ObjectUUID, false)
 	if err != nil {
 		return nil, nil, err
@@ -227,7 +228,7 @@ func newVolumeOptionsFromVolID(volID string, volOpt, secrets map[string]string) 
 		}
 	}
 
-	volOptions.RootPath, err = getVolumeRootPathCeph(&volOptions, cr, volumeID(vid.FsSubvolName))
+	volOptions.RootPath, err = getVolumeRootPathCeph(ctx, &volOptions, cr, volumeID(vid.FsSubvolName))
 	if err != nil {
 		return nil, nil, err
 	}

@@ -19,6 +19,7 @@ package cephfs
 import (
 	"fmt"
 
+	"golang.org/x/net/context"
 	"github.com/ceph/ceph-csi/pkg/util"
 )
 
@@ -61,11 +62,11 @@ type CephFilesystem struct {
 	DataPoolIDs    []int    `json:"data_pool_ids"`
 }
 
-func getMetadataPool(monitors string, cr *util.Credentials, fsName string) (string, error) {
+func getMetadataPool(ctx context.Context, monitors string, cr *util.Credentials, fsName string) (string, error) {
 	// ./tbox ceph fs ls --format=json
 	// [{"name":"myfs","metadata_pool":"myfs-metadata","metadata_pool_id":4,...},...]
 	var filesystems []CephFilesystem
-	err := execCommandJSON(&filesystems,
+	err := execCommandJSON(ctx, &filesystems,
 		"ceph",
 		"-m", monitors,
 		"--id", cr.ID,
@@ -91,11 +92,11 @@ type CephFilesystemDump struct {
 	Filesystems []CephFilesystemDetails `json:"filesystems"`
 }
 
-func getFsName(monitors string, cr *util.Credentials, fscID int64) (string, error) {
+func getFsName(ctx context.Context, monitors string, cr *util.Credentials, fscID int64) (string, error) {
 	// ./tbox ceph fs dump --format=json
 	// JSON: {...,"filesystems":[{"mdsmap":{},"id":<n>},...],...}
 	var fsDump CephFilesystemDump
-	err := execCommandJSON(&fsDump,
+	err := execCommandJSON(ctx, &fsDump,
 		"ceph",
 		"-m", monitors,
 		"--id", cr.ID,

@@ -25,7 +25,6 @@ import (
 
 	"github.com/ceph/ceph-csi/pkg/util"
 
-	"k8s.io/klog"
 	"golang.org/x/net/context"
 )
 
@@ -52,7 +51,7 @@ func getCephRootPathLocalDeprecated(volID volumeID) string {
 	return fmt.Sprintf("%s/controller/volumes/root-%s", PluginFolder, string(volID))
 }
 
-func getVolumeRootPathCeph(volOptions *volumeOptions, cr *util.Credentials, volID volumeID) (string, error) {
+func getVolumeRootPathCeph(ctx context.Context, volOptions *volumeOptions, cr *util.Credentials, volID volumeID) (string, error) {
 	stdout, _, err := util.ExecCommand(
 		"ceph",
 		"fs",
@@ -68,7 +67,7 @@ func getVolumeRootPathCeph(volOptions *volumeOptions, cr *util.Credentials, volI
 		"--keyfile="+cr.KeyFile)
 
 	if err != nil {
-		klog.Errorf("failed to get the rootpath for the vol %s(%s)", string(volID), err)
+		util.Errorf(ctx, "failed to get the rootpath for the vol %s(%s)", string(volID), err)
 		return "", err
 	}
 	return strings.TrimSuffix(string(stdout), "\n"), nil
@@ -152,23 +151,23 @@ func mountCephRoot(volID volumeID, volOptions *volumeOptions, adminCr *util.Cred
 	return nil
 }
 
-func unmountCephRoot(volID volumeID) {
+func unmountCephRoot(ctx context.Context, volID volumeID) {
 	cephRoot := getCephRootPathLocalDeprecated(volID)
 
 	if err := unmountVolume(cephRoot); err != nil {
-		klog.Errorf("failed to unmount %s with error %s", cephRoot, err)
+		util.Errorf(ctx, "failed to unmount %s with error %s", cephRoot, err)
 	} else {
 		if err := os.Remove(cephRoot); err != nil {
-			klog.Errorf("failed to remove %s with error %s", cephRoot, err)
+			util.Errorf(ctx, "failed to remove %s with error %s", cephRoot, err)
 		}
 	}
 }
 
-func purgeVolumeDeprecated(volID volumeID, adminCr *util.Credentials, volOptions *volumeOptions) error {
+func purgeVolumeDeprecated(ctx context.Context, volID volumeID, adminCr *util.Credentials, volOptions *volumeOptions) error {
 	if err := mountCephRoot(volID, volOptions, adminCr); err != nil {
 		return err
 	}
-	defer unmountCephRoot(volID)
+	defer unmountCephRoot(ctx, volID)
 
 	var (
 		volRoot         = getCephRootVolumePathLocalDeprecated(volID)
@@ -181,7 +180,7 @@ func purgeVolumeDeprecated(volID volumeID, adminCr *util.Credentials, volOptions
 		}
 	} else {
 		if !pathExists(volRootDeleting) {
-			klog.V(4).Infof("cephfs: volume %s not found, assuming it to be already deleted", volID)
+			util.V(4).Infof(ctx, "cephfs: volume %s not found, assuming it to be already deleted", volID)
 			return nil
 		}
 	}
