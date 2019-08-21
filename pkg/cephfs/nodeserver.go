@@ -173,7 +173,7 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	volID := req.GetVolumeId()
 
 	if err := util.CreateMountPoint(targetPath); err != nil {
-		klog.Errorf("failed to create mount point at %s: %v", targetPath, err)
+		util.Errorf(ctx, "failed to create mount point at %s: %v", targetPath, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -204,31 +204,31 @@ func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	isMnt, err := util.IsMountPoint(targetPath)
 
 	if err != nil {
-		klog.Errorf("stat failed: %v", err)
+		util.Errorf(ctx, "stat failed: %v", err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	if isMnt {
-		klog.Infof("cephfs: volume %s is already bind-mounted to %s", volID, targetPath)
+		util.Infof(ctx, "cephfs: volume %s is already bind-mounted to %s", volID, targetPath)
 		return &csi.NodePublishVolumeResponse{}, nil
 	}
 
 	// It's not, mount now
 
-	if err = bindMount(req.GetStagingTargetPath(), req.GetTargetPath(), req.GetReadonly(), mountOptions); err != nil {
-		klog.Errorf("failed to bind-mount volume %s: %v", volID, err)
+	if err = bindMount(ctx, req.GetStagingTargetPath(), req.GetTargetPath(), req.GetReadonly(), mountOptions); err != nil {
+		util.Errorf(ctx, "failed to bind-mount volume %s: %v", volID, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	if err = volumeMountCache.nodePublishVolume(volID, targetPath, req.GetReadonly()); err != nil {
-		klog.Warningf("mount-cache: failed to publish volume %s %s: %v", volID, targetPath, err)
+	if err = volumeMountCache.nodePublishVolume(ctx, volID, targetPath, req.GetReadonly()); err != nil {
+		util.Warningf(ctx, "mount-cache: failed to publish volume %s %s: %v", volID, targetPath, err)
 	}
 
-	klog.Infof("cephfs: successfully bind-mounted volume %s to %s", volID, targetPath)
+	util.Infof(ctx, "cephfs: successfully bind-mounted volume %s to %s", volID, targetPath)
 
 	err = os.Chmod(targetPath, 0777)
 	if err != nil {
-		klog.Errorf("failed to change targetpath permission for volume %s: %v", volID, err)
+		util.Errorf(ctx, "failed to change targetpath permission for volume %s: %v", volID, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 

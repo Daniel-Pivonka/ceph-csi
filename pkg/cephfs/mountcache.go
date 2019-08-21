@@ -9,6 +9,7 @@ import (
 
 	"github.com/ceph/ceph-csi/pkg/util"
 	"github.com/pkg/errors"
+	"golang.org/x/net/context"
 	"k8s.io/klog"
 )
 
@@ -246,7 +247,7 @@ func (mc *volumeMountCacheMap) nodeUnStageVolume(volID string) error {
 	return mc.nodeCacheStore.Delete(genVolumeMountCacheFileName(volID))
 }
 
-func (mc *volumeMountCacheMap) nodePublishVolume(volID, targetPath string, readOnly bool) error {
+func (mc *volumeMountCacheMap) nodePublishVolume(ctx context.Context, volID, targetPath string, readOnly bool) error {
 	if !mc.isEnable() {
 		return nil
 	}
@@ -258,7 +259,7 @@ func (mc *volumeMountCacheMap) nodePublishVolume(volID, targetPath string, readO
 		return errors.New("mount-cache: node publish volume failed to find cache entry for volume")
 	}
 	volumeMountCache.volumes[volID].TargetPaths[targetPath] = readOnly
-	return mc.updateNodeCache(volID)
+	return mc.updateNodeCache(ctx, volID)
 }
 
 func (mc *volumeMountCacheMap) nodeUnPublishVolume(volID, targetPath string) error {
@@ -276,10 +277,10 @@ func (mc *volumeMountCacheMap) nodeUnPublishVolume(volID, targetPath string) err
 	return mc.updateNodeCache(volID)
 }
 
-func (mc *volumeMountCacheMap) updateNodeCache(volID string) error {
+func (mc *volumeMountCacheMap) updateNodeCache(ctx context.Context, volID string) error {
 	me := volumeMountCache.volumes[volID]
 	if err := volumeMountCache.nodeCacheStore.Delete(genVolumeMountCacheFileName(volID)); err == nil {
-		klog.Infof("mount-cache: metadata not found, delete mount cache failed for volume %s", volID)
+		util.Infof(ctx, "mount-cache: metadata not found, delete mount cache failed for volume %s", volID)
 	}
 	return mc.nodeCacheStore.Create(genVolumeMountCacheFileName(volID), me)
 }
